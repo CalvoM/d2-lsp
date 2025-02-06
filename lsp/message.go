@@ -16,7 +16,7 @@ type Message struct {
 type Request struct {
 	Message
 	ID     int    `json:"id"`
-	Method string `json:"method"`
+	Method Method `json:"method"`
 	Params any    `json:"params,omitempty"`
 }
 

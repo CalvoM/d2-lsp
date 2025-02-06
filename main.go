@@ -2,18 +2,47 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
+	"io"
 	"log"
+	"log/slog"
 	"os"
+
+	"github.com/CalvoM/d2-lsp/lsp"
+	"github.com/CalvoM/d2-lsp/lsprpc"
+)
+
+var (
+	LOG    *log.Logger
+	output io.Writer
 )
 
 func main() {
 	// TODO: Setup better logging
-	LOG := getLogger("/home/d1r3ct0r/Coding/Projects/d2-lsp/logger.txt")
+	LOG = getLogger("/tmp/d2lsp.txt")
+	output = os.Stdout
 	LOG.Println("Getting started")
 	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Split(lsprpc.Split)
 	for scanner.Scan() {
-		msg := scanner.Text()
-		LOG.Println(msg)
+		msg := scanner.Bytes()
+		method, content, err := lsprpc.DecodeMessage(msg)
+		if err != nil {
+			panic(err)
+		}
+		HandleMessages(method, content)
+	}
+}
+
+func HandleMessages(method lsp.Method, content []byte) {
+	LOG.Printf("Parsing `%s`", method)
+	switch method {
+	case lsp.Initialize:
+		var initRequest lsp.InitializeRequest
+		if err := json.Unmarshal(content, &initRequest); err != nil {
+			LOG.Printf("Failed to parse initialize request: %v", err)
+		}
+		LOG.Printf("Connected to: %s %s", initRequest.Params.ClientInfo.Name, initRequest.Params.ClientInfo.Version)
 	}
 }
 
@@ -22,6 +51,5 @@ func getLogger(filename string) *log.Logger {
 	if err != nil {
 		panic("hey, you didnt give me a good file")
 	}
-
-	return log.New(logfile, "[educationalsp]", log.Ldate|log.Ltime|log.Lshortfile)
+	return slog.NewLogLogger(slog.NewJSONHandler(logfile, nil), slog.LevelInfo)
 }

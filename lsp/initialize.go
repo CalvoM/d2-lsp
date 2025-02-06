@@ -20,7 +20,7 @@ type ClientInfo struct {
 }
 
 type WorkDoneProgressParams struct {
-	WorkDoneToken int `json:"WorkDoneToken,omitempty"`
+	WorkDoneToken int `json:"workDoneToken,omitempty"`
 }
 
 type WorkspaceFolder struct {
