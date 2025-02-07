@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"flag"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -11,8 +13,16 @@ import (
 
 var LOG *log.Logger
 
+const LSP_VERSION = "0.0.1"
+
 func main() {
 	// TODO: Setup better logging
+	version := flag.Bool("version", false, "Prints the version of d2 lsp")
+	flag.Parse()
+	if *version {
+		fmt.Println("d2lsp ", LSP_VERSION)
+		os.Exit(0)
+	}
 	LOG = getLogger("/tmp/d2lsp.txt")
 	LOG.Println("Getting started")
 	scanner := bufio.NewScanner(os.Stdin)
