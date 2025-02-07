@@ -17,19 +17,13 @@ go build main.go
 To setup and test this Lsp locally for *.d2* files please add this to your nvim configuration
 
 ```lua
-local client = vim.lsp.start_client({
-  name = "D2lsp",
-  cmd = { "/path/to/d2-lsp/main" },
-})
-
-if not client then
-  vim.notify("Lsp not well setup")
-end
-
 vim.api.nvim_create_autocmd("FileType", {
   pattern = "d2",
   callback = function()
-    vim.lsp.buf_attach_client(0, client)
+    vim.lsp.buf_attach_client(
+      0,
+      vim.lsp.start_client({ name = "d2lsp", cmd = { "/path/to/d2-lsp/main" } })
+    )
   end,
 })
 ```
