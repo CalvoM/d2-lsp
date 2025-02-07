@@ -1,19 +1,13 @@
-package lsprpc
+package lsp
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
-
-	"github.com/CalvoM/d2-lsp/lsp"
 )
-
-type RPCHeader struct {
-	ContentLength int    `json:"Content-Length"`
-	ContentType   string `json:"Content-Type,omitempty"`
-}
 
 // Encodes the messages by adding the header part
 // and split content
@@ -23,13 +17,7 @@ func Encode(content any) string {
 		// Handle error gracefully
 		panic(err)
 	}
-	header := RPCHeader{ContentLength: len(data)}
-	headerData, err := json.Marshal(header)
-	if err != nil {
-		// Handle error gracefully
-		panic(err)
-	}
-	return fmt.Sprintf("%s\r\n\r\n%s", headerData, data)
+	return fmt.Sprintf("Content-Length:%d\r\n\r\n%s", len(data), data)
 }
 
 func Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -52,7 +40,7 @@ func Split(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	return totalLength, data[:totalLength], nil
 }
 
-func DecodeMessage(msg []byte) (lsp.Method, []byte, error) {
+func DecodeMessage(msg []byte) (Method, []byte, error) {
 	header, content, found := bytes.Cut(msg, []byte{'\r', '\n', '\r', '\n'})
 	if !found {
 		return "", nil, errors.New("Did not find separator")
@@ -65,10 +53,15 @@ func DecodeMessage(msg []byte) (lsp.Method, []byte, error) {
 		return "", nil, err
 	}
 
-	var baseMessage lsp.Request
+	var baseMessage Request
 	if err := json.Unmarshal(content[:contentLength], &baseMessage); err != nil {
 		return "", nil, err
 	}
 
 	return baseMessage.Method, content[:contentLength], nil
+}
+
+func sendResponse(message any) {
+	encodedData := Encode(message)
+	os.Stdout.Write([]byte(encodedData))
 }

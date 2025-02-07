@@ -25,12 +25,33 @@ type Request struct {
 // The result property of the ResponseMessage should be set to null in this case to signal a successful request.
 type Response struct {
 	Message
-	ID     *int `json:"id"`
-	Result *any `json:"result,omitempty"`
+	ID *int `json:"id"`
 }
 
 // A notification message. A processed notification message must not send a response back.
 type Notification struct {
+	Message
 	Method string `json:"method"`
-	Params any    `json:"params,omitempty"`
+}
+
+// TextDocumentDidOpenNotification handles textDocument/didOpen notifications
+
+type TextDocumentDidOpenNotification struct {
+	Notification
+	Params DidOpenTextDocumentParams `json:"params,omitempty"`
+}
+
+type TextDocumentItem struct {
+	// The text document's URI.
+	URI DocumentURI `json:"uri"`
+	// The text document's language identifier.
+	LanguageID string `json:"languageId"`
+	// The version number of this document (it will increase after each change, including undo/redo).
+	Version int `json:"version"`
+	// The content of the opened text document.
+	Text string `json:"text"`
+}
+
+type DidOpenTextDocumentParams struct {
+	TextDocument TextDocumentItem `json:"textDocument"`
 }
