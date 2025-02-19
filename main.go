@@ -26,7 +26,8 @@ func main() {
 	LOG = getLogger("/tmp/d2lsp.txt")
 	LOG.Println("Getting started")
 	scanner := bufio.NewScanner(os.Stdin)
-	lsp.ParseClientMessageBytes(LOG, scanner)
+	server := lsp.NewServerHandler()
+	server.ParseClientMessageBytes(LOG, scanner)
 }
 
 func getLogger(filename string) *log.Logger {

@@ -8,7 +8,17 @@ import (
 
 var LspLOG *log.Logger
 
-func ParseClientMessageBytes(LOG *log.Logger, scanner *bufio.Scanner) {
+type ServerHandler struct {
+	openFiles map[string]TextDocumentItem
+}
+
+func NewServerHandler() ServerHandler {
+	h := ServerHandler{}
+	h.openFiles = make(map[string]TextDocumentItem)
+	return h
+}
+
+func (h *ServerHandler) ParseClientMessageBytes(LOG *log.Logger, scanner *bufio.Scanner) {
 	LspLOG = LOG
 	scanner.Split(Split)
 	for scanner.Scan() {
@@ -17,11 +27,11 @@ func ParseClientMessageBytes(LOG *log.Logger, scanner *bufio.Scanner) {
 		if err != nil {
 			panic(err)
 		}
-		HandleClientMessages(method, content)
+		h.HandleClientMessages(method, content)
 	}
 }
 
-func HandleClientMessages(method Method, content []byte) {
+func (h *ServerHandler) HandleClientMessages(method Method, content []byte) {
 	LspLOG.Printf("Parsing `%s`", method)
 	switch method {
 	case Initialize:
@@ -37,7 +47,13 @@ func HandleClientMessages(method Method, content []byte) {
 		if err := json.Unmarshal(content, &didOpenNotification); err != nil {
 			LspLOG.Printf("Failed to parse initialize request: %v", err)
 		}
-		LspLOG.Println(didOpenNotification)
+		if _, ok := h.openFiles[string(didOpenNotification.Params.TextDocument.URI)]; ok {
+			LspLOG.Println("Already opened file: ", string(didOpenNotification.Params.TextDocument.URI))
+			h.openFiles[string(didOpenNotification.Params.TextDocument.URI)] = didOpenNotification.Params.TextDocument
+		} else {
+			h.openFiles[string(didOpenNotification.Params.TextDocument.URI)] = didOpenNotification.Params.TextDocument
+		}
+		LspLOG.Println(h.openFiles)
 	case TextDocumentDidChange:
 		LspLOG.Println(string(content))
 	case TextDocumentDidClose:
