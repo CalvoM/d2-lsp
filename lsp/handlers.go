@@ -55,7 +55,11 @@ func (h *ServerHandler) HandleClientMessages(method Method, content []byte) {
 		}
 		LspLOG.Println(h.openFiles)
 	case TextDocumentDidChange:
-		LspLOG.Println(string(content))
+		var didChangeNotification TextDocumentDidChangeNotification
+		if err := json.Unmarshal(content, &didChangeNotification); err != nil {
+			LspLOG.Printf("Failed to parse initialize request: %v", err)
+		}
+		LspLOG.Println(didChangeNotification.Params)
 	case TextDocumentDidClose:
 		LspLOG.Println(string(content))
 	case Shutdown:
