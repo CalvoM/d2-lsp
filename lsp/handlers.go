@@ -9,12 +9,12 @@ import (
 var LspLOG *log.Logger
 
 type ServerHandler struct {
-	openFiles map[string]TextDocumentItem
+	state StateManager
 }
 
 func NewServerHandler() ServerHandler {
 	h := ServerHandler{}
-	h.openFiles = make(map[string]TextDocumentItem)
+	h.state = NewStateManager()
 	return h
 }
 
@@ -47,21 +47,19 @@ func (h *ServerHandler) HandleClientMessages(method Method, content []byte) {
 		if err := json.Unmarshal(content, &didOpenNotification); err != nil {
 			LspLOG.Printf("Failed to parse initialize request: %v", err)
 		}
-		if _, ok := h.openFiles[string(didOpenNotification.Params.TextDocument.URI)]; ok {
-			LspLOG.Println("Already opened file: ", string(didOpenNotification.Params.TextDocument.URI))
-			h.openFiles[string(didOpenNotification.Params.TextDocument.URI)] = didOpenNotification.Params.TextDocument
-		} else {
-			h.openFiles[string(didOpenNotification.Params.TextDocument.URI)] = didOpenNotification.Params.TextDocument
-		}
-		LspLOG.Println(h.openFiles)
+		h.state.AddDocument(didOpenNotification.Params.TextDocument)
 	case TextDocumentDidChange:
 		var didChangeNotification TextDocumentDidChangeNotification
 		if err := json.Unmarshal(content, &didChangeNotification); err != nil {
 			LspLOG.Printf("Failed to parse initialize request: %v", err)
 		}
-		LspLOG.Println(didChangeNotification.Params)
+		h.state.UpdateDocument(didChangeNotification.Params.TextDocument.URI, didChangeNotification.Params.ContentChanges)
 	case TextDocumentDidClose:
-		LspLOG.Println(string(content))
+		var didCloseNotification TextDocumentDidCloseNotification
+		if err := json.Unmarshal(content, &didCloseNotification); err != nil {
+			LspLOG.Printf("Failed to parse initialize request: %v", err)
+		}
+		h.state.CloseDocument(didCloseNotification.Params.textDocument.URI)
 	case Shutdown:
 		LspLOG.Println(string(content))
 	case Initialized:
