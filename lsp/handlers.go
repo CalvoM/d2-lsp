@@ -77,6 +77,14 @@ func (h *ServerHandler) HandleClientMessages(method Method, content []byte) {
 			LspLOG.Printf("Failed to parse %v request: %v", method, err)
 		}
 		h.state.CloseDocument(didCloseNotification.Params.textDocument.URI)
+	case TextDocumentDeclaration:
+		var declarationRequest DeclarationRequest
+		if err := json.Unmarshal(content, &declarationRequest); err != nil {
+			LspLOG.Printf("Failed to parse %v request: %v", method, err)
+		}
+		h.state.GoToDeclaration(declarationRequest.Params.TextDocument.URI, declarationRequest.Params.Position)
+		declResponse := NewDeclarationResponse(declarationRequest.ID, declarationRequest.Params.TextDocument.URI)
+		sendResponse(declResponse)
 	case Shutdown:
 		var shutdownRequest ShutdownRequest
 		if err := json.Unmarshal(content, &shutdownRequest); err != nil {

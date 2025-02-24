@@ -18,14 +18,6 @@ type OptionalVersionedTextDocumentIdentifier struct {
 	TextDocumentIdentifier
 	Version *int `json:"version,omitempty"`
 }
-type Position struct {
-	Line      int `json:"line"`
-	Character int `json:"character"`
-}
-type Range struct {
-	Start Position `json:"start"`
-	End   Position `json:"end"`
-}
 type TextDocumentContentChangeEvent struct {
 	Text  string `json:"text"`
 	Range Range  `json:"range,omitempty"`

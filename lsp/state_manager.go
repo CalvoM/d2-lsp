@@ -46,6 +46,15 @@ func (s *StateManager) UpdateDocument(uri DocumentURI, changes []TextDocumentCon
 	s.ParseTrees[document.URI] = tree
 }
 
+func (s *StateManager) GoToDeclaration(uri DocumentURI, position Position) Location {
+	_, ok := s.Documents[uri]
+	if !ok {
+		LspLOG.Println("Warning: File not found to get declaration ", uri)
+	}
+	return Location{}
+}
+
+// CloseDocument Close opened document and clean resources
 func (s *StateManager) CloseDocument(uri DocumentURI) {
 	_, ok := s.Documents[uri]
 	if !ok {
