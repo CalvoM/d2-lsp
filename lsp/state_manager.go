@@ -1,6 +1,8 @@
 package lsp
 
 import (
+	"strings"
+
 	tree_sitter_d2 "github.com/ravsii/tree-sitter-d2/bindings/go"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 )
@@ -9,6 +11,12 @@ type StateManager struct {
 	Documents  map[DocumentURI]TextDocumentItem
 	ParseTrees map[DocumentURI]*tree_sitter.Tree
 	Parser     *tree_sitter.Parser
+}
+
+type TextWordLocation struct {
+	Text  string
+	Start int
+	End   int
 }
 
 func NewStateManager() StateManager {
@@ -47,11 +55,49 @@ func (s *StateManager) UpdateDocument(uri DocumentURI, changes []TextDocumentCon
 }
 
 func (s *StateManager) GoToDeclaration(uri DocumentURI, position Position) Location {
-	_, ok := s.Documents[uri]
+	doc, ok := s.Documents[uri]
 	if !ok {
 		LspLOG.Println("Warning: File not found to get declaration ", uri)
 	}
+	twLoc := s.getLocationOfVariableOnFile(doc.Text, position)
+	LspLOG.Println(twLoc)
+	currentTree := s.ParseTrees[uri]
+	cursor := currentTree.Walk()
+	cursor.GotoFirstChild()
+	defer cursor.Close()
 	return Location{}
+}
+
+func (s StateManager) getLocationOfVariableOnFile(text string, position Position) TextWordLocation {
+	lines := strings.Split(text, "\n")
+	row := lines[position.Line]
+	start := position.Character
+
+	backIdx := start
+	for backIdx >= 0 {
+		backIdx--
+		if backIdx < 0 {
+			backIdx = 0
+			break
+		}
+		if row[backIdx] == ' ' {
+			backIdx++
+			break
+		}
+	}
+	currIdx := start
+	for currIdx <= (len(row) - 1) {
+		currIdx++
+		if currIdx >= len(row) {
+			currIdx = len(row) - 1
+			break
+		}
+		if row[currIdx] == ' ' {
+			currIdx--
+			break
+		}
+	}
+	return TextWordLocation{row[backIdx : currIdx+1], backIdx, currIdx}
 }
 
 // CloseDocument Close opened document and clean resources
