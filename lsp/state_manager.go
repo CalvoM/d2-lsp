@@ -1,6 +1,8 @@
 package lsp
 
 import (
+	"errors"
+	"slices"
 	"strings"
 
 	tree_sitter_d2 "github.com/ravsii/tree-sitter-d2/bindings/go"
@@ -54,25 +56,89 @@ func (s *StateManager) UpdateDocument(uri DocumentURI, changes []TextDocumentCon
 	s.ParseTrees[document.URI] = tree
 }
 
-func (s *StateManager) GoToDeclaration(uri DocumentURI, position Position) Location {
+func (s *StateManager) GoToDefinition(uri DocumentURI, position Position) Location {
 	doc, ok := s.Documents[uri]
 	if !ok {
-		LspLOG.Println("Warning: File not found to get declaration ", uri)
+		LspLOG.Println("Warning: File not found to get definition ", uri)
 	}
-	twLoc := s.getLocationOfVariableOnFile(doc.Text, position)
-	LspLOG.Println(twLoc)
+	s.getLocationOfVariableOnFile(doc.Text, position)
+	bytePosition := s.convertPositionToBytePosition(doc.Text, position)
 	currentTree := s.ParseTrees[uri]
-	cursor := currentTree.Walk()
-	cursor.GotoFirstChild()
-	defer cursor.Close()
+	start, end, err := s.getIdentifierByPosition(currentTree, bytePosition)
+	if err != nil {
+		LspLOG.Panicln(err.Error())
+	}
+	startCol := s.convertBytePositionToLocation(doc.Text, position.Line, start)
+	identLen := end - start
+	LspLOG.Printf("The identifier is found at %v and %v. (%v) of length %v", position.Line, startCol, doc.Text[start:end], identLen)
 	return Location{}
+}
+
+func (s *StateManager) getIdentifierByPosition(tree *tree_sitter.Tree, bytePosition int) (start, end uint, err error) {
+	cursor := tree.Walk()
+	LspLOG.Println(cursor.Node().ToSexp())
+	defer cursor.Close()
+	cursor.GotoFirstChild()
+	for {
+		currentNode := cursor.Node()
+		if currentNode.StartByte() <= uint(bytePosition) && uint(bytePosition) <= currentNode.EndByte() {
+			if currentNode.GrammarName() == "identifier" {
+				LspLOG.Println(currentNode.ToSexp())
+				start = currentNode.StartByte()
+				end = currentNode.EndByte()
+				err = nil
+				LspLOG.Println(start, end, err, bytePosition)
+				return
+			}
+			if cursor.GotoFirstChild() {
+				continue
+			}
+		}
+		for !cursor.GotoNextSibling() {
+			if !cursor.GotoParent() {
+				start = 0
+				end = 0
+				err = errors.New("we could not get the identifier")
+				return
+			}
+		}
+	}
+}
+
+func (s *StateManager) getDefinitionOfIdentifier(tree *tree_sitter.Tree) {
+}
+
+func (s *StateManager) convertPositionToBytePosition(text string, position Position) int {
+	lines := strings.Split(text, "\n")
+	byteCount := 0
+	for line_index, line := range lines {
+		if line_index == position.Line {
+			byteCount += position.Character
+			break
+		}
+		byteCount += len(line) + 1 // Add NL
+	}
+	return byteCount
+}
+
+func (s *StateManager) convertBytePositionToLocation(text string, row int, bytePosition uint) uint {
+	lines := strings.Split(text, "\n")
+	byteCount := 0
+	for line_index, line := range lines {
+		if line_index == row {
+			break
+		}
+		byteCount += len(line) + 1 // Add NL
+	}
+	col := bytePosition - uint(byteCount)
+	return col
 }
 
 func (s StateManager) getLocationOfVariableOnFile(text string, position Position) TextWordLocation {
 	lines := strings.Split(text, "\n")
 	row := lines[position.Line]
 	start := position.Character
-
+	backDelim := []byte{'{', ' ', '.'}
 	backIdx := start
 	for backIdx >= 0 {
 		backIdx--
@@ -80,19 +146,20 @@ func (s StateManager) getLocationOfVariableOnFile(text string, position Position
 			backIdx = 0
 			break
 		}
-		if row[backIdx] == ' ' {
+		if slices.Contains(backDelim, row[backIdx]) {
 			backIdx++
 			break
 		}
 	}
 	currIdx := start
+	frontDelim := []byte{':', '}', '{', ' ', '.'}
 	for currIdx <= (len(row) - 1) {
 		currIdx++
 		if currIdx >= len(row) {
 			currIdx = len(row) - 1
 			break
 		}
-		if row[currIdx] == ' ' {
+		if slices.Contains(frontDelim, row[currIdx]) {
 			currIdx--
 			break
 		}
