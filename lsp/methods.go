@@ -10,6 +10,7 @@ const (
 	TextDocumentDidClose    Method = "textDocument/didClose"
 	TextDocumentDidSave     Method = "textDocument/didSave"
 	TextDocumentDeclaration Method = "textDocument/declaration"
+	TextDocumentDefinition  Method = "textDocument/definition"
 	Shutdown                Method = "shutdown"
 	Exit                    Method = "exit"
 )
