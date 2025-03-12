@@ -70,8 +70,15 @@ func (s *StateManager) GoToDefinition(uri DocumentURI, position Position) Locati
 	start = s.adjustSpacedIdentifier(doc.Text, start)
 	startCol := s.convertBytePositionToLocation(doc.Text, position.Line, start)
 	identLen := end - start
+	endCol := startCol + identLen
 	LspLOG.Printf("The identifier is found at %v and %v. (%v) of length %v", position.Line, startCol, doc.Text[start:end], identLen)
-	return Location{}
+	return Location{
+		URI: uri,
+		Range: Range{
+			Start: Position{Line: position.Line, Character: int(startCol)},
+			End:   Position{Line: position.Line, Character: int(endCol)},
+		},
+	}
 }
 
 func (s *StateManager) adjustSpacedIdentifier(text string, startBytePosition uint) uint {

@@ -82,8 +82,9 @@ func (h *ServerHandler) HandleClientMessages(method Method, content []byte) {
 		if err := json.Unmarshal(content, &definitionRequest); err != nil {
 			LspLOG.Printf("Failed to parse %v request: %v", method, err)
 		}
-		h.state.GoToDefinition(definitionRequest.Params.TextDocument.URI, definitionRequest.Params.Position)
-		declResponse := NewDefinitionResponse(definitionRequest.ID, definitionRequest.Params.TextDocument.URI)
+		loc := h.state.GoToDefinition(definitionRequest.Params.TextDocument.URI, definitionRequest.Params.Position)
+		declResponse := NewDefinitionResponse(definitionRequest.ID, loc)
+		LspLOG.Println(declResponse)
 		sendResponse(declResponse)
 	case Shutdown:
 		var shutdownRequest ShutdownRequest
