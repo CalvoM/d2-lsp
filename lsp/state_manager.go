@@ -49,7 +49,6 @@ func (s *StateManager) UpdateDocument(uri DocumentURI, changes []TextDocumentCon
 		document.Text = change.Text
 	}
 	s.Documents[uri] = document
-	LspLOG.Println("Updated file:", uri)
 	currentTree := s.ParseTrees[uri]
 	currentTree.Close()
 	tree := s.Parser.Parse([]byte(document.Text), nil)
@@ -68,10 +67,23 @@ func (s *StateManager) GoToDefinition(uri DocumentURI, position Position) Locati
 	if err != nil {
 		LspLOG.Panicln(err.Error())
 	}
+	start = s.adjustSpacedIdentifier(doc.Text, start)
 	startCol := s.convertBytePositionToLocation(doc.Text, position.Line, start)
 	identLen := end - start
 	LspLOG.Printf("The identifier is found at %v and %v. (%v) of length %v", position.Line, startCol, doc.Text[start:end], identLen)
 	return Location{}
+}
+
+func (s *StateManager) adjustSpacedIdentifier(text string, startBytePosition uint) uint {
+	adjustedStartByte := startBytePosition
+	for {
+		if text[adjustedStartByte] == ' ' || text[adjustedStartByte] == '\n' {
+			adjustedStartByte++
+		} else {
+			break
+		}
+	}
+	return adjustedStartByte
 }
 
 func (s *StateManager) getIdentifierByPosition(tree *tree_sitter.Tree, bytePosition int) (start, end uint, err error) {
@@ -83,11 +95,9 @@ func (s *StateManager) getIdentifierByPosition(tree *tree_sitter.Tree, bytePosit
 		currentNode := cursor.Node()
 		if currentNode.StartByte() <= uint(bytePosition) && uint(bytePosition) <= currentNode.EndByte() {
 			if currentNode.GrammarName() == "identifier" {
-				LspLOG.Println(currentNode.ToSexp())
 				start = currentNode.StartByte()
 				end = currentNode.EndByte()
 				err = nil
-				LspLOG.Println(start, end, err, bytePosition)
 				return
 			}
 			if cursor.GotoFirstChild() {
@@ -128,6 +138,7 @@ func (s *StateManager) convertBytePositionToLocation(text string, row int, byteP
 		if line_index == row {
 			break
 		}
+		// before you find the row
 		byteCount += len(line) + 1 // Add NL
 	}
 	col := bytePosition - uint(byteCount)
