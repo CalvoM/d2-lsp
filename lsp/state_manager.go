@@ -12,6 +12,7 @@ import (
 type StateManager struct {
 	Documents  map[DocumentURI]TextDocumentItem
 	ParseTrees map[DocumentURI]*tree_sitter.Tree
+	Variables  []*tree_sitter.Node
 	Parser     *tree_sitter.Parser
 }
 
@@ -24,7 +25,7 @@ type TextWordLocation struct {
 func NewStateManager() StateManager {
 	parser := tree_sitter.NewParser()
 	parser.SetLanguage(tree_sitter.NewLanguage(tree_sitter_d2.Language()))
-	return StateManager{Documents: map[DocumentURI]TextDocumentItem{}, ParseTrees: map[DocumentURI]*tree_sitter.Tree{}, Parser: parser}
+	return StateManager{Documents: map[DocumentURI]TextDocumentItem{}, ParseTrees: map[DocumentURI]*tree_sitter.Tree{}, Parser: parser, Variables: []*tree_sitter.Node{}}
 }
 
 // AddDocument adds an opened file
@@ -68,16 +69,58 @@ func (s *StateManager) GoToDefinition(uri DocumentURI, position Position) Locati
 		LspLOG.Panicln(err.Error())
 	}
 	start = s.adjustSpacedIdentifier(doc.Text, start)
-	startCol := s.convertBytePositionToLocation(doc.Text, position.Line, start)
-	identLen := end - start
+	identNode := s.findDefinition(currentTree, doc.Text, doc.Text[start:end])
+	start = s.adjustSpacedIdentifier(doc.Text, identNode.StartByte())
+	row, startCol := s.convertByteToLocation(doc.Text, start)
+	identLen := identNode.EndByte() - identNode.StartByte()
 	endCol := startCol + identLen
-	LspLOG.Printf("The identifier is found at %v and %v. (%v) of length %v", position.Line, startCol, doc.Text[start:end], identLen)
 	return Location{
 		URI: uri,
 		Range: Range{
-			Start: Position{Line: position.Line, Character: int(startCol)},
-			End:   Position{Line: position.Line, Character: int(endCol)},
+			Start: Position{Line: int(row), Character: int(startCol)},
+			End:   Position{Line: int(row), Character: int(endCol)},
 		},
+	}
+}
+
+func (s *StateManager) findDefinition(tree *tree_sitter.Tree, source, identifierName string) *tree_sitter.Node {
+	cursor := tree.Walk()
+	defer cursor.Close()
+	cursor.GotoFirstChild()
+	for {
+		currentNode := cursor.Node()
+		if currentNode.GrammarName() == "declaration" {
+			childrenNodes := currentNode.Children(cursor)
+			for _, child := range childrenNodes {
+				if child.GrammarName() == "identifier" {
+					// Get all variables in the `vars` block
+					if string(child.Utf8Text([]byte(source))) == "vars" {
+						blockNode := child.NextNamedSibling()
+						if blockNode.GrammarName() != "block" {
+							LspLOG.Println("Error during parsing")
+							return nil
+						}
+						defintionNodes := blockNode.NamedChildren(cursor)
+						for _, defNode := range defintionNodes {
+							identNode := defNode.NamedChild(0)
+							s.Variables = append(s.Variables, identNode)
+							if strings.Contains(string(identNode.Utf8Text([]byte(source))), identifierName) {
+								return identNode
+							}
+						}
+					}
+				}
+			}
+			return nil
+		}
+		if cursor.GotoFirstChild() {
+			continue
+		}
+		for !cursor.GotoNextSibling() {
+			if !cursor.GotoParent() {
+				return nil
+			}
+		}
 	}
 }
 
@@ -95,7 +138,6 @@ func (s *StateManager) adjustSpacedIdentifier(text string, startBytePosition uin
 
 func (s *StateManager) getIdentifierByPosition(tree *tree_sitter.Tree, bytePosition int) (start, end uint, err error) {
 	cursor := tree.Walk()
-	LspLOG.Println(cursor.Node().ToSexp())
 	defer cursor.Close()
 	cursor.GotoFirstChild()
 	for {
@@ -136,6 +178,23 @@ func (s *StateManager) convertPositionToBytePosition(text string, position Posit
 		byteCount += len(line) + 1 // Add NL
 	}
 	return byteCount
+}
+
+func (s *StateManager) convertByteToLocation(text string, bytePosition uint) (row, col uint) {
+	lines := strings.Split(text, "\n")
+	byteCount := 0
+	for lineIndex, line := range lines {
+		LspLOG.Println(line, bytePosition, len(line))
+		if byteCount+len(line)+1 > int(bytePosition) {
+			row = uint(lineIndex)
+			break
+		}
+		// before you find the row
+		byteCount += len(line) + 1 // Add NL
+		row++
+	}
+	col = bytePosition - uint(byteCount)
+	return
 }
 
 func (s *StateManager) convertBytePositionToLocation(text string, row int, bytePosition uint) uint {
