@@ -86,6 +86,7 @@ func (s *StateManager) GoToDefinition(uri DocumentURI, position Position) Locati
 func (s *StateManager) findDefinition(tree *tree_sitter.Tree, source, identifierName string) *tree_sitter.Node {
 	cursor := tree.Walk()
 	defer cursor.Close()
+	LspLOG.Println(cursor.Node().ToSexp())
 	cursor.GotoFirstChild()
 	for {
 		currentNode := cursor.Node()
@@ -109,11 +110,16 @@ func (s *StateManager) findDefinition(tree *tree_sitter.Tree, source, identifier
 							}
 						}
 					}
+					LspLOG.Println(child.Utf8Text([]byte(source)), identifierName)
+					if strings.Contains(string(child.Utf8Text([]byte(source))), identifierName) {
+						return &child
+					}
 				}
 			}
 			return nil
 		}
 		if cursor.GotoFirstChild() {
+			LspLOG.Println("GotoFirstChild")
 			continue
 		}
 		for !cursor.GotoNextSibling() {

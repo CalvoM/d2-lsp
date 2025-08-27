@@ -95,7 +95,6 @@ func (h *ServerHandler) HandleClientMessages(method Method, content []byte) {
 		sendResponse(shutdownResponse)
 		h.serverState = ServerShutdown
 	case Exit:
-		LspLOG.Println(string(content))
 		if h.serverState == ServerShutdown {
 			os.Exit(0)
 		} else {
